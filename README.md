@@ -6,6 +6,7 @@ validates them, and stores proposal and audit history.
 ## What You Get
 
 - REST API: plan, approve, proposals, audits
+- Browser chat UI for conversational plan + execute
 - SQLite persistence (`agent_data.db` by default)
 - JSON schema validation for proposed actions
 - Optional local LLM integration
@@ -25,6 +26,7 @@ PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000
 
 Open:
 - http://127.0.0.1:8000/docs
+- http://127.0.0.1:8000/chat-ui
 
 ## One Command: Start + Test Endpoint
 
@@ -43,6 +45,14 @@ Expected output:
 - `200 [...]` (or `200 []` on a fresh DB)
 
 ## API Usage
+
+Conversational endpoint (plan + optional execute in one call):
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/chat \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"Create an S3 bucket named demo-bucket for testing","execute":true,"dry_run":false}'
+```
 
 Create a proposal:
 
