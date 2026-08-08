@@ -1,95 +1,110 @@
 # agentic_aws_manager
 
-Agentic AWS Resource Manager is a local FastAPI service that creates and tracks proposed AWS actions.
+Agentic AWS Manager is a local FastAPI service that proposes AWS-style actions,
+validates them, and stores proposal and audit history.
 
-This repository includes:
-- REST API for plan, approve, proposals, and audits
-- SQLite persistence
+## What You Get
+
+- REST API: plan, approve, proposals, audits
+- SQLite persistence (`agent_data.db` by default)
 - JSON schema validation for proposed actions
 - Optional local LLM integration
-- Simple CLI client
+- CLI client for common flows
 
-## Quick Start
+## Quickstart
 
-1. Open a terminal in the project root.
-2. Create and activate a Python 3.10 virtual environment.
-3. Install dependencies.
-4. Start the API.
+Use Python 3.10 in this repo.
 
-Commands:
+```bash
+python3.10 -m venv .venv310
+source .venv310/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000
+```
 
-	python3.10 -m venv .venv310
-	source .venv310/bin/activate
-	python -m pip install --upgrade pip
-	python -m pip install -r requirements.txt
-	PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000
-
-Open API docs:
+Open:
 - http://127.0.0.1:8000/docs
 
-## One-Command Start + Smoke Test
+## One Command: Start + Test Endpoint
 
-Run this from the project root:
+Run from the project root:
 
-	source .venv310/bin/activate && (PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000 >/tmp/agentic_aws_manager.log 2>&1 &) && sleep 2 && curl -fsS http://127.0.0.1:8000/docs >/dev/null && python - <<'PY'
-	import urllib.request
-	req = urllib.request.Request('http://127.0.0.1:8000/proposals', method='GET')
-	with urllib.request.urlopen(req, timeout=10) as r:
-		print(r.status, r.read().decode())
-	PY
+```bash
+source .venv310/bin/activate && (PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000 >/tmp/agentic_aws_manager.log 2>&1 &) && sleep 2 && curl -fsS http://127.0.0.1:8000/docs >/dev/null && python - <<'PY'
+import urllib.request
+req = urllib.request.Request('http://127.0.0.1:8000/proposals', method='GET')
+with urllib.request.urlopen(req, timeout=10) as r:
+    print(r.status, r.read().decode())
+PY
+```
 
-Expected result:
-- Status code 200
-- Response body such as []
+Expected output:
+- `200 [...]` (or `200 []` on a fresh DB)
 
-## API Examples
+## API Usage
 
-Create a plan:
+Create a proposal:
 
-	curl -sS -X POST http://127.0.0.1:8000/plan \
-	  -H 'Content-Type: application/json' \
-	  -d '{"prompt":"Create an S3 bucket named demo-bucket for testing"}'
+```bash
+curl -sS -X POST http://127.0.0.1:8000/plan \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"Create an S3 bucket named demo-bucket for testing"}'
+```
 
 List proposals:
 
-	curl -sS http://127.0.0.1:8000/proposals
+```bash
+curl -sS http://127.0.0.1:8000/proposals
+```
 
 Get one proposal:
 
-	curl -sS http://127.0.0.1:8000/proposals/<proposal_id>
+```bash
+curl -sS http://127.0.0.1:8000/proposals/<proposal_id>
+```
 
-Approve proposal as dry run:
+Approve (dry run):
 
-	curl -sS -X POST http://127.0.0.1:8000/approve/<proposal_id> \
-	  -H 'Content-Type: application/json' \
-	  -d '{"dry_run": true}'
+```bash
+curl -sS -X POST http://127.0.0.1:8000/approve/<proposal_id> \
+  -H 'Content-Type: application/json' \
+  -d '{"dry_run": true}'
+```
 
 List audits:
 
-	curl -sS http://127.0.0.1:8000/audits
+```bash
+curl -sS http://127.0.0.1:8000/audits
+```
 
-## CLI Examples
+## CLI Usage
 
-In a second terminal while API is running:
+In a second terminal, while API is running:
 
-	source .venv310/bin/activate
-	PYTHONPATH=src python scripts/cli.py --help
-	PYTHONPATH=src python scripts/cli.py plan-s3 demo-bucket
-	PYTHONPATH=src python scripts/cli.py list-proposals
-	PYTHONPATH=src python scripts/cli.py audits
+```bash
+source .venv310/bin/activate
+PYTHONPATH=src python scripts/cli.py --help
+PYTHONPATH=src python scripts/cli.py plan-s3 demo-bucket
+PYTHONPATH=src python scripts/cli.py list-proposals
+PYTHONPATH=src python scripts/cli.py approve <proposal_id>
+PYTHONPATH=src python scripts/cli.py audits
+```
 
 ## Run Tests
 
-	source .venv310/bin/activate
-	PYTHONPATH=src pytest -q
+```bash
+source .venv310/bin/activate
+PYTHONPATH=src pytest -q
+```
 
 ## Troubleshooting
 
-- If pip fails in system Python on macOS with externally-managed-environment, use the virtual environment steps above.
-- If dependency resolution fails, ensure you are using Python 3.10.
-- If port 8000 is already in use, change the port in the uvicorn command.
-- If imports fail, confirm PYTHONPATH=src is set when running app and tests.
+- `externally-managed-environment` on macOS: use the local virtual environment above.
+- Dependency conflicts: confirm you are using Python 3.10.
+- Import errors: make sure `PYTHONPATH=src` is present in run/test commands.
+- Port conflict on 8000: run uvicorn on a different port.
 
 ## Full Guide
 
-For deeper architecture and endpoint details, see FULL_README.md.
+See `FULL_README.md` for architecture, workflow details, and deeper operational notes.

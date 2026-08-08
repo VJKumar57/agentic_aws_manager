@@ -1,173 +1,262 @@
 # Agentic AWS Resource Manager
 
-A compact scaffold for an agentic workflow that proposes AWS resource actions,
-validates them, and stores proposal/audit history.
+A complete setup and API walkthrough for running this repository locally.
 
-## What This Repo Does
+## 1. What This Repository Does
 
-This project runs a local API service that:
-- accepts natural language intent
-- asks an LLM to propose AWS-style actions
-- validates the action schema
+This project runs a local FastAPI service that:
+- accepts a natural-language AWS request
+- generates a proposed action list using a local LLM adapter
+- validates the proposal against schema rules
 - stores proposals and audit events in SQLite
-- supports a dry-run approval path
+- supports approval in dry-run mode
 
-Core paths:
-- src/app_with_validation.py
-- src/agentic_aws_manager/
-- scripts/cli.py
-- tests/test_validator.py
+Main paths:
+- `src/app_with_validation.py` (API entry point)
+- `src/agentic_aws_manager/` (core modules)
+- `scripts/cli.py` (CLI helper)
+- `tests/test_validator.py` (unit tests)
 
-## Prerequisites
+## 2. Prerequisites
 
-- macOS, Linux, or Windows with Python 3.10 available
-- terminal access
-
-Recommended Python for this repo:
 - Python 3.10
+- Terminal access
 
-## Setup
+Important:
+- Use Python 3.10 for reliable dependency installation in this repo.
+- Python 3.13 may fail with dependency/build conflicts.
 
-From project root:
+## 3. Complete Setup
 
-    python3.10 -m venv .venv310
-    source .venv310/bin/activate
-    python -m pip install --upgrade pip
-    python -m pip install -r requirements.txt
+From repository root:
 
-If python3.10 is not found, install it first and retry.
+```bash
+python3.10 -m venv .venv310
+source .venv310/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
 
-## Start The API
+Optional quick check:
 
-    source .venv310/bin/activate
-    PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000
+```bash
+python -V
+```
 
-Swagger UI:
+Expected output should include `Python 3.10`.
+
+## 4. Start the API
+
+Run:
+
+```bash
+source .venv310/bin/activate
+PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000
+```
+
+Open Swagger UI:
 - http://127.0.0.1:8000/docs
 
-## One-Command Start + Test Endpoint
+## 5. One-Command Start + Smoke Test
 
-Use this from project root:
+Use this command from repository root:
 
-    source .venv310/bin/activate && (PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000 >/tmp/agentic_aws_manager.log 2>&1 &) && sleep 2 && curl -fsS http://127.0.0.1:8000/docs >/dev/null && python - <<'PY'
-    import urllib.request
-    req = urllib.request.Request('http://127.0.0.1:8000/proposals', method='GET')
-    with urllib.request.urlopen(req, timeout=10) as r:
-	 print(r.status, r.read().decode())
-    PY
+```bash
+source .venv310/bin/activate && (PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000 >/tmp/agentic_aws_manager.log 2>&1 &) && sleep 2 && curl -fsS http://127.0.0.1:8000/docs >/dev/null && python - <<'PY'
+import urllib.request
+req = urllib.request.Request('http://127.0.0.1:8000/proposals', method='GET')
+with urllib.request.urlopen(req, timeout=10) as r:
+    print(r.status, r.read().decode())
+PY
+```
 
-Expected output:
-- HTTP status 200
-- response body, often [] in a fresh run
+Expected result:
+- `200` status
+- JSON output, usually `[]` on a fresh DB
 
-## End-to-End Usage Flow
+## 6. API Walkthrough
 
-1. Create a plan proposal
+### 6.1 Endpoint Summary
 
-	curl -sS -X POST http://127.0.0.1:8000/plan \
-	  -H 'Content-Type: application/json' \
-	  -d '{"prompt":"Create an S3 bucket named demo-bucket for testing"}'
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/plan` | Create a proposal from a natural-language prompt |
+| GET | `/proposals` | List all proposals |
+| GET | `/proposals/{proposal_id}` | Get one proposal |
+| POST | `/approve/{proposal_id}` | Approve and execute (supports dry-run) |
+| GET | `/audits` | List audit events |
 
-2. Copy proposal_id from response.
+### 6.2 Step-by-Step API Flow
 
-3. Inspect all proposals
+1. Create a proposal
 
-	curl -sS http://127.0.0.1:8000/proposals
+```bash
+curl -sS -X POST http://127.0.0.1:8000/plan \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"Create an S3 bucket named demo-bucket for testing"}'
+```
 
-4. Inspect one proposal
+Typical response shape:
 
-	curl -sS http://127.0.0.1:8000/proposals/<proposal_id>
+```json
+{
+  "proposal_id": "<uuid>",
+  "actions": [
+    {
+      "action": "create",
+      "type_name": "AWS::S3::Bucket",
+      "properties": {
+        "BucketName": "example-bucket"
+      }
+    }
+  ]
+}
+```
 
-5. Approve with dry run
+2. List proposals
 
-	curl -sS -X POST http://127.0.0.1:8000/approve/<proposal_id> \
-	  -H 'Content-Type: application/json' \
-	  -d '{"dry_run": true}'
+```bash
+curl -sS http://127.0.0.1:8000/proposals
+```
 
-6. View audit trail
+3. Get one proposal
 
-	curl -sS http://127.0.0.1:8000/audits
+```bash
+curl -sS http://127.0.0.1:8000/proposals/<proposal_id>
+```
 
-## CLI Usage
+4. Approve proposal as dry run
 
-Run CLI commands while API is active:
+```bash
+curl -sS -X POST http://127.0.0.1:8000/approve/<proposal_id> \
+  -H 'Content-Type: application/json' \
+  -d '{"dry_run": true}'
+```
 
-    source .venv310/bin/activate
-    PYTHONPATH=src python scripts/cli.py --help
-    PYTHONPATH=src python scripts/cli.py plan-s3 demo-bucket
-    PYTHONPATH=src python scripts/cli.py list-proposals
-    PYTHONPATH=src python scripts/cli.py approve <proposal_id>
-    PYTHONPATH=src python scripts/cli.py audits
+5. View audit history
 
-The CLI default API base URL is:
-- http://localhost:8000
+```bash
+curl -sS http://127.0.0.1:8000/audits
+```
 
-Use custom base URL:
+### 6.3 Full Copy-Paste E2E Script
 
-    PYTHONPATH=src python scripts/cli.py --base http://127.0.0.1:8000 list-proposals
+This script creates a proposal, extracts `proposal_id`, fetches it, dry-runs approval, and prints audits.
 
-## Local Data
+```bash
+source .venv310/bin/activate
 
-SQLite file default:
-- ./agent_data.db
+PLAN_JSON=$(curl -sS -X POST http://127.0.0.1:8000/plan \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"Create an S3 bucket named e2e-demo-bucket"}')
 
-Override DB path:
+echo "$PLAN_JSON"
 
-    AGENT_DB_PATH=/path/to/agent_data.db PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000
+PROPOSAL_ID=$(echo "$PLAN_JSON" | python - <<'PY'
+import json, sys
+payload = json.loads(sys.stdin.read())
+print(payload["proposal_id"])
+PY
+)
 
-## LLM Behavior
+echo "proposal_id=$PROPOSAL_ID"
 
-LLM load path priority:
-1. explicit model_path in request
-2. LLAMA_MODEL_PATH environment variable
+curl -sS "http://127.0.0.1:8000/proposals/$PROPOSAL_ID"
+curl -sS -X POST "http://127.0.0.1:8000/approve/$PROPOSAL_ID" \
+  -H 'Content-Type: application/json' \
+  -d '{"dry_run": true}'
+curl -sS http://127.0.0.1:8000/audits
+```
+
+## 7. CLI Walkthrough
+
+With API running in one terminal, use another terminal:
+
+```bash
+source .venv310/bin/activate
+PYTHONPATH=src python scripts/cli.py --help
+PYTHONPATH=src python scripts/cli.py plan-s3 demo-bucket
+PYTHONPATH=src python scripts/cli.py list-proposals
+PYTHONPATH=src python scripts/cli.py approve <proposal_id>
+PYTHONPATH=src python scripts/cli.py audits
+```
+
+Change API base URL when needed:
+
+```bash
+PYTHONPATH=src python scripts/cli.py --base http://127.0.0.1:8000 list-proposals
+```
+
+## 8. Data and Environment Variables
+
+Default DB file:
+- `./agent_data.db`
+
+Override database path:
+
+```bash
+AGENT_DB_PATH=/path/to/agent_data.db PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000
+```
+
+LLM load priority:
+1. `model_path` in `/plan` request body
+2. `LLAMA_MODEL_PATH` environment variable
 3. transformers fallback
-4. echo fallback behavior
+4. echo fallback
 
-When output is not valid JSON actions list, the app writes a fallback S3 action and logs a plan_fallback audit event.
+Behavior note:
+- If generated LLM output is not valid JSON action list, the service writes a fallback S3 action and logs a `plan_fallback` audit event.
 
-## Run Tests
+## 9. Testing
 
-    source .venv310/bin/activate
-    PYTHONPATH=src pytest -q
+Run unit tests:
 
-## Common Issues
+```bash
+source .venv310/bin/activate
+PYTHONPATH=src pytest -q
+```
 
-1. pip says externally-managed-environment on macOS
-- Cause: using system Python installation directly
-- Fix: use the virtual environment steps above
+## 10. Troubleshooting
 
-2. pydantic or dependency conflicts
-- Cause: unsupported Python version
-- Fix: use Python 3.10 for this repo
+### `externally-managed-environment` on macOS
+Cause:
+- using system Python package installation directly
 
-3. Module import errors for app modules
-- Cause: src path not on import path
-- Fix: include PYTHONPATH=src in commands
+Fix:
+- use `.venv310` virtual environment setup from section 3
 
-4. Port already in use
-- Cause: another process on 8000
-- Fix: start uvicorn on a different port
+### Dependency build/resolution errors
+Cause:
+- unsupported Python version
 
-## Suggested Daily Workflow
+Fix:
+- use Python 3.10
 
-1. Pull latest changes
+### `ModuleNotFoundError` for local package
+Cause:
+- `src` not on Python path
 
-	git pull --rebase
+Fix:
+- include `PYTHONPATH=src` for app/test commands
 
-2. Activate environment
+### Port 8000 already in use
+Fix:
+- start on another port, example `--port 8001`
+- update curl/CLI base URLs accordingly
 
-	source .venv310/bin/activate
+## 11. Daily Developer Workflow
 
-3. Run tests
+```bash
+git pull --rebase
+source .venv310/bin/activate
+PYTHONPATH=src pytest -q
+PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000
+```
 
-	PYTHONPATH=src pytest -q
+After code changes:
 
-4. Start API and validate docs endpoint
-
-	PYTHONPATH=src uvicorn app_with_validation:app --host 127.0.0.1 --port 8000
-
-5. Make changes, re-test, then commit and push
-
-	git add .
-	git commit -m "Describe your change"
-	git push
+```bash
+git add .
+git commit -m "Describe your change"
+git push
+```
