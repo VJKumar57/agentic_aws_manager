@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Proposal",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "properties": {
+      "action": { "type": "string", "enum": ["create", "delete", "update", "call"] },
+      "type_name": { "type": "string" },
+      "properties": { "type": ["object", "string"] },
+      "identifier": { "type": "string" },
+      "params": { "type": "object" }
+    },
+    "required": ["action"],
+    "oneOf": [
+      { "properties": { "action": { "const": "create" }, "type_name": {"type":"string"}, "properties": {} }, "required": ["type_name", "properties"] },
+      { "properties": { "action": { "const": "delete" }, "type_name": {"type":"string"}, "identifier": {} }, "required": ["type_name", "identifier"] },
+      { "properties": { "action": { "const": "update" }, "type_name": {"type":"string"}, "identifier": {} }, "required": ["type_name", "identifier"] },
+      { "properties": { "action": { "const": "call" }, "params": {} }, "required": ["params"] }
+    ],
+    "additionalProperties": false
+  }
+}
